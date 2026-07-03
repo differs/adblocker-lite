@@ -294,6 +294,9 @@ class CosmeticFilterEngine {
 
   scanProceduralAds() {
     const allElements = document.querySelectorAll('div, iframe, img, section, aside');
+
+    // 先扫描可疑链接广告（独立检测，不依赖图片）
+    this.scanSuspiciousLinks();
     let hiddenCount = 0;
 
     allElements.forEach(el => {
@@ -310,6 +313,77 @@ class CosmeticFilterEngine {
       }
       console.debug(`[AdBlocker] 程序化过滤隐藏了 ${hiddenCount} 个广告`);
     }
+  }
+
+  /** 扫描站外可疑链接并拦截其容器 */
+  scanSuspiciousLinks() {
+    const anchors = document.querySelectorAll(
+      'a[href^="http"]:not(nav a):not(header a):not(footer a)'
+    );
+    let count = 0;
+
+    for (const link of anchors) {
+      if (link.dataset.__abp_hidden) continue;
+      // 跳过已经被父容器隐藏的链接
+      if (link.closest('[data-__abp_hidden]')) continue;
+
+      try {
+        const href = link.getAttribute('href') || '';
+        const host = new URL(href).hostname;
+
+        // 同域跳过
+        if (host === location.hostname) continue;
+
+        // 域名无意义？→ 广告链接
+        if (this.isSuspiciousDomain(host)) {
+          // 找到合适的容器进行隐藏
+          const container = this._findAdContainer(link);
+          if (container) {
+            this.hideProcedural(container);
+            count++;
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (count > 0 && typeof statsCollector !== 'undefined') {
+      statsCollector.increment('procedural', count);
+    }
+  }
+
+  /**
+   * 为广告链接找到合适的隐藏容器
+   * 策略：从 link 向上找父元素，停在合理的块级容器
+   */
+  _findAdContainer(link) {
+    let el = link.parentElement;
+    let depth = 0;
+    while (el && el !== document.body && depth < 5) {
+      const tag = el.tagName.toLowerCase();
+      // 停在合理的容器标签
+      if (['div', 'section', 'article', 'li', 'td', 'aside',
+           'figure', 'ins'].includes(tag)) {
+        // 检查容器本身不含重要内容（只有链接和图片）
+        const textLen = (el.textContent || '').trim().length;
+        const linkCount = el.querySelectorAll('a').length;
+
+        // 容器内链接都指向站外+只含链接和图片→纯广告位
+        if (linkCount >= 1 && textLen < 500) {
+          return el;
+        }
+        // 更宽松：容器太小或太偏，不像正常内容
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const style = window.getComputedStyle(el);
+          if (style.position === 'fixed' || style.position === 'sticky') {
+            return el; // 固定/悬浮 → 广告
+          }
+        }
+      }
+      el = el.parentElement;
+      depth++;
+    }
+    return null;
   }
 
   isProceduralAd(el) {
@@ -690,6 +764,32 @@ class CosmeticFilterEngine {
 
       if (hiddenCount > 0) {
         this.proceduralHides += hiddenCount;
+      }
+
+      // 检查新节点中是否含可疑链接广告
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const links = node.tagName === 'A' ? [node] :
+                [...node.querySelectorAll('a[href^="http"]')];
+              for (const link of links) {
+                if (link.dataset.__abp_hidden) continue;
+                try {
+                  const host = new URL(link.getAttribute('href')).hostname;
+                  if (host !== location.hostname && this.isSuspiciousDomain(host)) {
+                    const container = this._findAdContainer(link);
+                    if (container) {
+                      this.hideProcedural(container);
+                      hiddenCount++;
+                      break;
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+        }
       }
     });
 
