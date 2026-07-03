@@ -584,10 +584,28 @@ class CosmeticFilterEngine {
     ];
     if (trashTLDs.some(t => hostname.endsWith(t))) return true;
 
-    // 主域名中数字 >= 字母数 → 随机生成特征
+    // 主域名特征分析
     const letters = (sld.match(/[a-z]/g) || []).length;
     const digits = (sld.match(/[0-9]/g) || []).length;
+    const vowels = (sld.match(/[aeiou]/g) || []).length;
+    const consonants = letters - vowels;
+    const uniqueChars = new Set(sld.split('')).size;
+
+    // 数字 >= 字母 → 随机生成
     if (digits >= letters && sld.length > 4) return true;
+
+    // 无元音字母 → 纯辅音乱码（pybzr, qwrtz, asdfg 等广告域名特征）
+    // 正常单词/拼音几乎都含元音
+    if (letters > 3 && vowels === 0) return true;
+
+    // 含数字且字母部分全是辅音（pybzr198, xmms2, cdn0 等）
+    if (digits > 0 && letters > 2 && vowels === 0) return true;
+
+    // 含数字且字母占比极低 → 大概率随机生成
+    if (digits > 0 && letters > 0 && (letters / (letters + digits) < 0.3)) return true;
+
+    // 字符种类极少（asdfasdf, qwqwqw 等键盘乱码）
+    if (sld.length >= 6 && uniqueChars <= 3) return true;
 
     // 主域名含 UUID 或类似随机串模式
     if (/[a-f0-9]{8}-[a-f0-9]{4}/.test(sld)) return true;
