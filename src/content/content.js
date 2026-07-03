@@ -105,16 +105,47 @@ class AdBlockerContent {
     const idStr = (typeof el.id === 'string' ? el.id : '').toLowerCase();
 
     // 只看那些可能含有广告的特定标签
-    if (tag !== 'div' && tag !== 'iframe' && tag !== 'ins' && tag !== 'section') {
+    if (tag !== 'div' && tag !== 'a' && tag !== 'section' &&
+        tag !== 'iframe' && tag !== 'ins') {
       return false;
     }
 
-    return (
+    // 特征 1：class/id 含广告关键词
+    const hasAdClass = (
       classStr.includes('ad-') || idStr.includes('ad-') ||
       classStr.includes('ads-') || idStr.includes('ads-') ||
       classStr.includes('sponsor') || idStr.includes('sponsor') ||
       classStr.includes('advert') || idStr.includes('advert')
     );
+    if (hasAdClass) return true;
+
+    // 特征 2：含有站外链接的图片容器（原生广告）
+    if (el.querySelectorAll) {
+      const links = el.querySelectorAll('a[href]');
+      const imgs = el.querySelectorAll('img');
+      if (links.length > 0 && imgs.length > 0) {
+        let hasExternalLink = false;
+        let hasAdLabel = false;
+
+        for (const link of links) {
+          const href = link.getAttribute('href') || '';
+          try {
+            const host = new URL(href, location.href).hostname;
+            if (host !== location.hostname) hasExternalLink = true;
+          } catch (_) {}
+          const t = (link.textContent || '').toLowerCase();
+          if (['赞助', '广告', '推广', 'sponsored', 'promoted'].some(p => t.includes(p))) hasAdLabel = true;
+        }
+        for (const img of imgs) {
+          const alt = (img.getAttribute('alt') || '').toLowerCase();
+          if (['sponsored', 'ad', '广告', '推广'].some(p => alt.includes(p))) hasAdLabel = true;
+        }
+
+        if (hasExternalLink || hasAdLabel) return true;
+      }
+    }
+
+    return false;
   }
 
   hideElement(el) {

@@ -371,6 +371,151 @@ class CosmeticFilterEngine {
       return true;
     }
 
+    // 特征 6：原生广告 / 伪装成内容的广告（图片+链接）
+    if (this.isNativeAd(el)) return true;
+
+    return false;
+  }
+
+  // ============================================================
+  // 原生广告检测（图片+链接、伪装内容、推荐组件）
+  // ============================================================
+
+  isNativeAd(el) {
+    const tag = el.tagName.toLowerCase();
+    const classStr = el.className?.toLowerCase() || '';
+    const idStr = el.id?.toLowerCase() || '';
+
+    // 跳过 body/html 和小元素
+    if (tag === 'body' || tag === 'html') return false;
+    if (el.dataset.__abp_hidden) return false;
+
+    // ---- 特征 A：图片被链接包裹，指向站外 ----
+    // <a href="https://ads.example.com"><img src="..."></a>
+    const links = el.querySelectorAll ? el.querySelectorAll('a[href]') : [];
+    const imgs = el.querySelectorAll ? el.querySelectorAll('img') : [];
+
+    if (links.length > 0 && imgs.length > 0) {
+      let hasExternalLink = false;
+      let hasExternalImg = false;
+      let hasAdLabel = false;
+
+      for (const link of links) {
+        const href = link.getAttribute('href') || '';
+        // 检查是否站外链接
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          try {
+            const linkHost = new URL(href, location.href).hostname;
+            if (linkHost !== location.hostname) {
+              hasExternalLink = true;
+              // 检查是否是已知广告/联盟域名
+              const adDomains = ['doubleclick', 'googlead', 'googlesyndication',
+                'amazon-adsystem', 'taboola', 'outbrain', 'criteo', 'shareasale',
+                'commissionjunction', 'rakuten', 'skimlinks', 'viglink',
+                'impactradius', 'cj.com', 'awin', 'zanox', 'tradedoubler'];
+              if (adDomains.some(d => linkHost.includes(d))) {
+                return true; // 明确是广告网络链接
+              }
+            }
+          } catch (_) {}
+        }
+
+        // 检查链接文字是否含广告标签
+        const linkText = link.textContent?.toLowerCase() || '';
+        if (['赞助', '广告', '推广', '推荐', ' sponsored', ' promoted',
+            ' ad', '赞助商', '广告商', '了解更多', '立即购买', '查看详情',
+            'shop now', 'learn more', 'buy now', 'get it now'
+           ].some(p => linkText.includes(p))) {
+          hasAdLabel = true;
+        }
+      }
+
+      for (const img of imgs) {
+        const src = img.getAttribute('src') || '';
+        if (src && !src.startsWith('data:') && !src.startsWith('blob:')) {
+          try {
+            const imgHost = new URL(src, location.href).hostname;
+            if (imgHost !== location.hostname) {
+              hasExternalImg = true;
+            }
+          } catch (_) {}
+        }
+        // 检查图片alt文字是否含广告标签
+        const alt = (img.getAttribute('alt') || '').toLowerCase();
+        if (['sponsored', 'ad', '广告', '推广', 'promoted', 'sponsor']
+            .some(p => alt.includes(p))) {
+          hasAdLabel = true;
+        }
+      }
+
+      // 站外链接 + 站外图片 = 非常可能是有图广告
+      if (hasExternalLink && hasExternalImg) return true;
+      // 站外链接 + 广告标签文字 = 非常可能是广告
+      if (hasExternalLink && hasAdLabel) return true;
+    }
+
+    // ---- 特征 B：容器内含广告标签文字 ----
+    const text = el.textContent?.toLowerCase() || '';
+    const adLabels = [
+      'sponsored', 'sponsored content', 'sponsored by', 'sponsored post',
+      'promoted', 'promoted content', 'promoted by', 'promoted story',
+      'advertisement', 'ad choice', 'ad feedback',
+      '广告', '推广', '赞助', '赞助商', '赞助内容', '推荐内容',
+      '推荐阅读', '为您推荐', '品牌推广', '品牌专区',
+      'you may also like', 'recommended for you', 'around the web',
+      'from around the web', 'more from the web', 'powered by',
+      'presented by', 'brought to you by', 'paid content',
+      'partner content', 'native ad',
+    ];
+    const hasAdLabel = adLabels.some(p => text.includes(p));
+
+    if (hasAdLabel) {
+      // 有广告标签 + 包含图片或链接 → 确定为原生广告
+      if (imgs.length > 0 || links.length > 0) return true;
+    }
+
+    // ---- 特征 C：推荐组件容器 ----
+    // 常见推荐组件 class/id 名（可能混淆但值得检查）
+    const nativeAdClasses = [
+      'recommend', 'recommended', 'suggest', 'suggested',
+      'related-content', 'related-post', 'you-may-like',
+      'native-ad', 'nativead', 'sponsored-content',
+      'promoted-content', 'trending-content', 'popular-content',
+      'taboola', 'outbrain', 'revcontent', 'content-ad',
+      'in-content', 'incontent', 'inarticle', 'in-article',
+      'recommendation', 'recommendations',
+      'also-read', 'also-like', 'more-article',
+    ];
+    for (const nc of nativeAdClasses) {
+      if (classStr.includes(nc) || idStr.includes(nc)) {
+        // 包含链接 → 大概率是广告推荐组件
+        if (links.length >= 2) return true;
+      }
+    }
+
+    // ---- 特征 D：图片尺寸符合广告标准比例 + 可点击跳站外 ----
+    if (tag === 'a' || tag === 'div' || tag === 'section') {
+      const hasAnchor = tag === 'a' || el.querySelector('a[href]');
+      if (hasAnchor && imgs.length > 0) {
+        for (const img of imgs) {
+          const iw = img.naturalWidth || img.width;
+          const ih = img.naturalHeight || img.height;
+          if (iw > 0 && ih > 0) {
+            // 标准广告尺寸比例
+            const adRatios = [
+              [728, 90], [468, 60], [300, 250], [336, 280],
+              [160, 600], [300, 600], [970, 90], [970, 250],
+              [320, 50], [320, 100],
+            ];
+            const ratioMatch = adRatios.some(([w, h]) =>
+              Math.abs(iw - w) < 20 && Math.abs(ih - h) < 20
+            );
+            if (ratioMatch && this.hasExternalLink(el)) return true;
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -400,6 +545,21 @@ class CosmeticFilterEngine {
       const src = el.getAttribute('src') || '';
       return src && !src.includes(location.hostname);
     }
+    return false;
+  }
+
+  /** 检查元素内是否有站外链接 */
+  hasExternalLink(el) {
+    try {
+      const links = el.tagName === 'A' ? [el] : [...el.querySelectorAll('a[href]')];
+      for (const link of links) {
+        const href = link.getAttribute('href') || '';
+        if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
+          const host = new URL(href, location.href).hostname;
+          if (host !== location.hostname) return true;
+        }
+      }
+    } catch (_) {}
     return false;
   }
 
