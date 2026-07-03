@@ -421,20 +421,14 @@ class CosmeticFilterEngine {
 
       for (const link of links) {
         const href = link.getAttribute('href') || '';
-        // 检查是否站外链接
         if (href && !href.startsWith('#') && !href.startsWith('javascript:')) {
           try {
             const linkHost = new URL(href, location.href).hostname;
             if (linkHost !== location.hostname) {
               hasExternalLink = true;
-              // 检查是否是已知广告/联盟域名
-              const adDomains = ['doubleclick', 'googlead', 'googlesyndication',
-                'amazon-adsystem', 'taboola', 'outbrain', 'criteo', 'shareasale',
-                'commissionjunction', 'rakuten', 'skimlinks', 'viglink',
-                'impactradius', 'cj.com', 'awin', 'zanox', 'tradedoubler'];
-              if (adDomains.some(d => linkHost.includes(d))) {
-                return true; // 明确是广告网络链接
-              }
+
+              // 站外链接 + 域名"无意义"（随机串/IP/垃圾TLD）+ 含图片 → 判定为广告
+              if (this.isSuspiciousDomain(linkHost) && imgs.length > 0) return true;
             }
           } catch (_) {}
         }
@@ -459,7 +453,6 @@ class CosmeticFilterEngine {
             }
           } catch (_) {}
         }
-        // 检查图片alt文字是否含广告标签
         const alt = (img.getAttribute('alt') || '').toLowerCase();
         if (['sponsored', 'ad', '广告', '推广', 'promoted', 'sponsor']
             .some(p => alt.includes(p))) {
@@ -564,6 +557,49 @@ class CosmeticFilterEngine {
       const src = el.getAttribute('src') || '';
       return src && !src.includes(location.hostname);
     }
+    return false;
+  }
+
+  /** 检测域名是否为"无意义域名"（广告/追踪特征） */
+  isSuspiciousDomain(hostname) {
+    if (!hostname) return false;
+
+    // IP 地址直连 —— 几乎全是广告/追踪
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return true;
+
+    // 提取主域名（SLD，不含子域名和 TLD）
+    const parts = hostname.split('.');
+    if (parts.length < 2) return false;
+    const sld = parts[parts.length - 2]; // 主域名部分（如 example.com 中的 example）
+    const tld = parts.slice(-2).join('.'); // TLD（如 .com, .co.uk, .cyou）
+
+    // 垃圾 TLD 列表
+    const trashTLDs = [
+      '.top', '.xyz', '.club', '.online', '.site', '.bid', '.loan', '.date',
+      '.win', '.men', '.mom', '.click', '.link', '.review', '.download',
+      '.work', '.stream', '.racing', '.accountant', '.trade', '.webcam',
+      '.science', '.party', '.review', '.country', '.faith', '.gq', '.ml',
+      '.cf', '.ga', '.tk', '.cyou', '.cfd', '.rest', '.bond', '.ooo',
+      '.lol', '.cool', '.icu', '.pw', '.live', '.life',
+    ];
+    if (trashTLDs.some(t => hostname.endsWith(t))) return true;
+
+    // 主域名中数字 >= 字母数 → 随机生成特征
+    const letters = (sld.match(/[a-z]/g) || []).length;
+    const digits = (sld.match(/[0-9]/g) || []).length;
+    if (digits >= letters && sld.length > 4) return true;
+
+    // 主域名含 UUID 或类似随机串模式
+    if (/[a-f0-9]{8}-[a-f0-9]{4}/.test(sld)) return true;
+    // 主域名全是十六进制字符且长度 > 8
+    if (/^[a-f0-9]{8,}$/.test(sld)) return true;
+    // 主域名含 "api" + 随机串 + 数字（追踪 API 特征）
+    if (/api.*[0-9]{3,}/.test(hostname)) return true;
+
+    // CloudFront / CDN 类子域名特征：随机串.cdn-provider.net
+    const cdnPattern = /^[a-z0-9]{8,32}\.(cloudfront|akamai|azureedge|fastly|cloudflare)\./;
+    if (cdnPattern.test(hostname)) return true;
+
     return false;
   }
 
