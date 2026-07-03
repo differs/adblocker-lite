@@ -688,6 +688,15 @@ class CosmeticFilterEngine {
     // 字符种类极少（asdfasdf, qwqwqw 等键盘乱码）
     if (sld.length >= 6 && uniqueChars <= 3) return true;
 
+    // 主域名 > 7 位 + 无元音 → 长串乱码广告域名
+    if (sld.length > 7 && vowels === 0) return true;
+
+    // 主域名 > 10 位 + 数字占比高 → 关键词堆砌/随机串
+    if (sld.length > 10 && digits > 0 && letters > 0 && vowels < 3) return true;
+
+    // 含 2 个以上连字符 → 关键词堆砌 ad-domain-name-2024
+    if ((sld.match(/-/g) || []).length >= 2) return true;
+
     // 主域名含 UUID 或类似随机串模式
     if (/[a-f0-9]{8}-[a-f0-9]{4}/.test(sld)) return true;
     // 主域名全是十六进制字符且长度 > 8
