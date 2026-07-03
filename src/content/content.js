@@ -113,6 +113,9 @@ class AdBlockerContent {
     el.style.setProperty('display', 'none', 'important');
     el.dataset.__abp_hidden = 'true';
     this.cssHiddenCount++;
+    if (typeof statsCollector !== 'undefined') {
+      statsCollector.increment('css_base');
+    }
   }
 
   hideBySelector(selector) {
@@ -158,6 +161,18 @@ function initialize() {
     adblocker = new AdBlockerContent();
   }
 }
+
+// ============================================================
+// 主世界统计消息监听
+// defense-injector.js 中的防御触发时通过 postMessage 回传
+// ============================================================
+window.addEventListener('message', (event) => {
+  if (event.source !== window) return;
+  if (event.data?.type !== '__ABP_STATS') return;
+  if (typeof statsCollector !== 'undefined') {
+    statsCollector.increment(event.data.category, event.data.count || 1);
+  }
+});
 
 // 等 cosmetic-engine.js 和 scriptlet-engine.js 先完成初始化
 if (document.readyState === 'loading') {

@@ -127,6 +127,9 @@ class TrackerParamStripper {
     });
 
     if (stripped > 0) {
+      if (typeof statsCollector !== 'undefined') {
+        statsCollector.increment('tracker_params', stripped);
+      }
       console.debug(`[AdBlocker] 清理了 ${stripped} 个追踪链接`);
     }
 

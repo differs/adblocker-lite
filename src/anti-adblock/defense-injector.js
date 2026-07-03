@@ -24,6 +24,11 @@ const DEFENSE_CODE = `
   if (window[AD_BLOCKER_MARKER]) return;
   window[AD_BLOCKER_MARKER] = true;
 
+  // 统计上报辅助函数
+  var _stats = function(cat, n) {
+    try { window.postMessage({ type: '__ABP_STATS', category: cat, count: n || 1 }, '*'); } catch(_) {}
+  };
+
   // ---- 诱饵元素检测模式 ----
   const BAIT_PATTERNS = [
     'pub_300x250', 'pub_300x250m', 'pub_728x90',
@@ -336,7 +341,7 @@ const DEFENSE_CODE = `
     window.open = function(url, name, features) {
       if (!url || typeof url !== 'string') return null;
       var _bp = ['ad', 'pop', 'popup', 'popunder', 'clickunder', 'sponsor', 'promo', 'banner', 'track', 'affiliate', 'offer', 'campaign', '//bit.ly/', '//tinyurl.com/', '//goo.gl/', '//adf.ly/'];
-      for (var i = 0; i < _bp.length; i++) { if (url.toLowerCase().indexOf(_bp[i]) !== -1) { return null; } }
+      for (var i = 0; i < _bp.length; i++) { if (url.toLowerCase().indexOf(_bp[i]) !== -1) { _stats('popup_blocked'); return null; } }
       return _open.call(window, url, name, features);
     };
   } catch(e) {}
@@ -347,7 +352,7 @@ const DEFENSE_CODE = `
     var _minerP = ['coinhive', 'coin-hive', 'miner', 'cryptoloot', 'webmine', 'minecrunch', 'coinnebula', 'reauthenticator', '2captcha', 'antigate'];
     window.Worker = function(url) {
       var us = typeof url === 'string' ? url : (url ? url.toString() : '');
-      for (var i = 0; i < _minerP.length; i++) { if (us.indexOf(_minerP[i]) !== -1) { return new _Worker('data:text/javascript;base64,' + btoa('')); } }
+      for (var i = 0; i < _minerP.length; i++) { if (us.indexOf(_minerP[i]) !== -1) { _stats('miner_blocked'); return new _Worker('data:text/javascript;base64,' + btoa('')); } }
       return new _Worker(url);
     };
     window.Worker.prototype = _Worker.prototype;

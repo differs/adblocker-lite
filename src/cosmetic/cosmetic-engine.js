@@ -61,7 +61,12 @@ class CosmeticFilterEngine {
     if (cssBuffer) {
       this.appendCSS(cssBuffer);
       this.genericCSSLoaded = true;
-      console.debug(`[AdBlocker] uBOL CSS 已注入 (${cssBuffer.length} bytes)`);
+      // 统计注入的 CSS 规则数量
+      const genericCount = cssBuffer.split('{ display: none !important; }').length - 1;
+      if (typeof statsCollector !== 'undefined') {
+        statsCollector.set('css_generic', genericCount);
+      }
+      console.debug(`[AdBlocker] uBOL CSS 已注入 (${cssBuffer.length} bytes, ${genericCount} rules)`);
     }
   }
 
@@ -298,6 +303,9 @@ class CosmeticFilterEngine {
 
     if (hiddenCount > 0) {
       this.proceduralHides += hiddenCount;
+      if (typeof statsCollector !== 'undefined') {
+        statsCollector.increment('procedural', hiddenCount);
+      }
       console.debug(`[AdBlocker] 程序化过滤隐藏了 ${hiddenCount} 个广告`);
     }
   }

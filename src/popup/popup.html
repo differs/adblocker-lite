@@ -43,6 +43,7 @@
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" data-tab="current">当前页面</button>
+      <button class="tab" data-tab="layered">统计详情</button>
       <button class="tab" data-tab="allowlist">白名单</button>
       <button class="tab" data-tab="about">关于</button>
     </div>
@@ -68,6 +69,20 @@
       </div>
     </div>
 
+    <!-- Tab Content: Layered Stats -->
+    <div class="tab-content" id="tab-layered">
+      <div class="layered-header">
+        <span class="layered-title">各层拦截分布</span>
+        <button class="btn btn-small" id="statsRefresh">🔄 刷新</button>
+      </div>
+      <div class="layered-summary">
+        总计拦截: <strong id="statsTotal">0</strong> 次
+      </div>
+      <div class="layer-items" id="layerItems">
+        <div class="empty-state">加载中...</div>
+      </div>
+    </div>
+
     <!-- Tab Content: Allowlist -->
     <div class="tab-content" id="tab-allowlist">
       <div class="allowlist-controls">
@@ -83,15 +98,15 @@
     <div class="tab-content" id="tab-about">
       <div class="about-section">
         <h3>AdBlocker Lite</h3>
-        <p>基于 declarativeNetRequest 的广告拦截扩展</p>
-        <p>版本: 1.0.0</p>
+        <p>基于 declarativeNetRequest + 16 层反检测的广告拦截扩展</p>
+        <p>版本: 2.1.0</p>
         <div class="tech-stack">
           <h4>技术栈</h4>
           <ul>
             <li>Manifest V3</li>
             <li>declarativeNetRequest API</li>
             <li>Service Worker</li>
-            <li>Content Scripts</li>
+            <li>Content Scripts (双世界模型)</li>
             <li>uBO Lite 规则引擎</li>
           </ul>
         </div>

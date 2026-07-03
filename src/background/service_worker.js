@@ -3,50 +3,56 @@
  *
  * v2.0 增强：
  * - 适配 uBOL 6 个核心规则集
- * - 修复 onRuleMatchedDebug 生产环境不可用问题
+ * - 分层拦截统计（DNR / CSS / procedural / scriptlet / tracker）
  * - 使用 getMatchedRules() API 获取拦截统计
- * - 增加规则集管理功能
  */
 
 const STORAGE_KEYS = {
-  BLOCKED_COUNTS: 'blocked_counts',
   ALLOWLIST: 'allowlist',
   DYNAMIC_RULES: 'dynamic_rules',
-  STATS: 'stats'
+  STATS: 'stats',
+  LAYERED_STATS: 'layered_stats',
 };
 
-// uBOL 默认启用的 6 个核心规则集
-const ENABLED_RULESETS = [
-  'ublock-filters',
-  'easylist',
-  'easyprivacy',
-  'pgl',
-  'ublock-badware',
-  'urlhaus-full',
-];
+// 分层统计默认值
+const DEFAULT_LAYERED_STATS = {
+  dnr: 0,
+  css_base: 0,
+  css_generic: 0,
+  css_specific: 0,
+  procedural: 0,
+  scriptlet: 0,
+  tracker_params: 0,
+  popup_blocked: 0,
+  miner_blocked: 0,
+  fetch_faked: 0,
+  bait_spoofed: 0,
+};
 
 // ============================================================
 // 初始化
 // ============================================================
 async function initialize() {
-  // 从 storage 恢复状态
+  // 总拦截统计
   const { stats } = await chrome.storage.local.get(STORAGE_KEYS.STATS);
   if (!stats) {
     await chrome.storage.local.set({
-      [STORAGE_KEYS.STATS]: {
-        totalBlocked: 0,
-        sessionBlocked: 0,
-        startTime: Date.now()
-      }
+      [STORAGE_KEYS.STATS]: { totalBlocked: 0, sessionBlocked: 0, startTime: Date.now() }
     });
   }
 
+  // 白名单
   const { allowlist } = await chrome.storage.local.get(STORAGE_KEYS.ALLOWLIST);
   if (!allowlist) {
     await chrome.storage.local.set({ [STORAGE_KEYS.ALLOWLIST]: [] });
   }
 
-  // 获取初始规则集统计
+  // 分层统计
+  const { layered_stats } = await chrome.storage.local.get(STORAGE_KEYS.LAYERED_STATS);
+  if (!layered_stats) {
+    await chrome.storage.local.set({ [STORAGE_KEYS.LAYERED_STATS]: { ...DEFAULT_LAYERED_STATS } });
+  }
+
   await refreshRulesetStats();
 }
 
@@ -54,38 +60,65 @@ chrome.runtime.onInstalled.addListener(initialize);
 chrome.runtime.onStartup.addListener(initialize);
 
 // ============================================================
-// 规则集统计（替代 onRuleMatchedDebug）
+// 规则集统计
 // ============================================================
 
-/**
- * 刷新规则集统计信息
- * 使用 getEnabledRulesets() 替代废弃的 onRuleMatchedDebug
- */
 async function refreshRulesetStats() {
   try {
     const enabledRulesets = await chrome.declarativeNetRequest.getEnabledRulesets();
     const availableRules = await chrome.declarativeNetRequest.getAvailableStaticRuleCount();
 
-    // 缓存到 storage 供 popup 使用
     await chrome.storage.local.set({
       [STORAGE_KEYS.DYNAMIC_RULES]: {
         enabledRulesets,
         availableRules,
-        lastUpdated: Date.now()
+        lastUpdated: Date.now(),
       }
     });
-  } catch (e) {
-    // 未打包模式下可能不可用
+  } catch (_) {}
+}
+
+// ============================================================
+// 分层拦截统计
+// ============================================================
+
+/** 累加一层统计 */
+async function addLayerStats(category, count) {
+  const { layered_stats } = await chrome.storage.local.get(STORAGE_KEYS.LAYERED_STATS);
+  const stats = layered_stats || { ...DEFAULT_LAYERED_STATS };
+  if (category in stats) {
+    stats[category] = (stats[category] || 0) + count;
+  }
+  await chrome.storage.local.set({ [STORAGE_KEYS.LAYERED_STATS]: stats });
+}
+
+/** 获取 DNR 最近匹配规则数 */
+async function fetchDNRBlockedCount() {
+  try {
+    const result = await chrome.declarativeNetRequest.getMatchedRules({
+      minTimeStamp: Date.now() - 60 * 60 * 1000,
+    });
+    return result?.rulesMatchedInfo?.length || 0;
+  } catch (_) {
+    return 0;
   }
 }
 
 // ============================================================
-// 消息处理：PopUp 与 Content Script 通信
+// 消息处理
 // ============================================================
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'GET_STATS':
       handleGetStats(sendResponse);
+      return true;
+
+    case 'GET_LAYERED_STATS':
+      handleGetLayeredStats(sendResponse);
+      return true;
+
+    case 'REPORT_STATS':
+      handleReportStats(message.stats, sendResponse);
       return true;
 
     case 'GET_ALLOWLIST':
@@ -119,18 +152,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleGetStats(sendResponse) {
   try {
-    const result = await chrome.storage.local.get([
-      STORAGE_KEYS.STATS,
-      STORAGE_KEYS.ALLOWLIST
-    ]);
-    const stats = result[STORAGE_KEYS.STATS] || {
-      totalBlocked: 0,
-      sessionBlocked: 0,
-      startTime: Date.now()
-    };
+    const result = await chrome.storage.local.get([STORAGE_KEYS.STATS, STORAGE_KEYS.ALLOWLIST]);
+    const stats = result[STORAGE_KEYS.STATS] || { totalBlocked: 0, sessionBlocked: 0, startTime: Date.now() };
     const allowlist = result[STORAGE_KEYS.ALLOWLIST] || [];
-
-    // 计算运行时间
     const uptime = Math.floor((Date.now() - stats.startTime) / 1000);
 
     sendResponse({
@@ -139,9 +163,51 @@ async function handleGetStats(sendResponse) {
         totalBlocked: stats.totalBlocked,
         sessionBlocked: stats.sessionBlocked,
         uptime,
-        allowlistCount: allowlist.length
+        allowlistCount: allowlist.length,
       }
     });
+  } catch (error) {
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+async function handleGetLayeredStats(sendResponse) {
+  try {
+    const { layered_stats } = await chrome.storage.local.get(STORAGE_KEYS.LAYERED_STATS);
+    const layerStats = layered_stats || { ...DEFAULT_LAYERED_STATS };
+
+    // 实时获取 DNR 拦截数
+    const dnrCount = await fetchDNRBlockedCount();
+    layerStats.dnr = dnrCount;
+
+    // 计算总和
+    const total = Object.values(layerStats).reduce((a, b) => a + b, 0);
+
+    sendResponse({ success: true, layered: layerStats, total });
+  } catch (error) {
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+async function handleReportStats(stats, sendResponse) {
+  try {
+    if (!stats) { sendResponse({ success: false }); return; }
+
+    for (const [category, count] of Object.entries(stats)) {
+      if (count > 0) {
+        await addLayerStats(category, count);
+      }
+    }
+
+    // 更新总拦截数
+    const { stats: oldStats } = await chrome.storage.local.get(STORAGE_KEYS.STATS);
+    const s = oldStats || { totalBlocked: 0, sessionBlocked: 0, startTime: Date.now() };
+    const increment = Object.values(stats).reduce((a, b) => a + b, 0);
+    s.totalBlocked += increment;
+    s.sessionBlocked += increment;
+    await chrome.storage.local.set({ [STORAGE_KEYS.STATS]: s });
+
+    sendResponse({ success: true });
   } catch (error) {
     sendResponse({ success: false, error: error.message });
   }
@@ -150,10 +216,7 @@ async function handleGetStats(sendResponse) {
 async function handleGetAllowlist(sendResponse) {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEYS.ALLOWLIST);
-    sendResponse({
-      success: true,
-      allowlist: result[STORAGE_KEYS.ALLOWLIST] || []
-    });
+    sendResponse({ success: true, allowlist: result[STORAGE_KEYS.ALLOWLIST] || [] });
   } catch (error) {
     sendResponse({ success: false, error: error.message });
   }
@@ -168,7 +231,6 @@ async function handleAddAllowlist(domain, sendResponse) {
       allowlist.push(domain);
       await chrome.storage.local.set({ [STORAGE_KEYS.ALLOWLIST]: allowlist });
 
-      // 为该域名添加允许规则（高优先级覆盖拦截规则）
       const ruleId = 90000 + allowlist.length;
       await chrome.declarativeNetRequest.updateDynamicRules({
         addRules: [{
@@ -180,7 +242,7 @@ async function handleAddAllowlist(domain, sendResponse) {
             resourceTypes: ['main_frame', 'sub_frame', 'stylesheet', 'script',
                            'image', 'font', 'object', 'xmlhttprequest', 'ping',
                            'csp_report', 'media', 'websocket', 'webtransport',
-                           'webbundle', 'other']
+                           'webbundle', 'other'],
           }
         }]
       });
@@ -196,20 +258,13 @@ async function handleRemoveAllowlist(domain, sendResponse) {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEYS.ALLOWLIST);
     let allowlist = result[STORAGE_KEYS.ALLOWLIST] || [];
-
     allowlist = allowlist.filter(d => d !== domain);
     await chrome.storage.local.set({ [STORAGE_KEYS.ALLOWLIST]: allowlist });
 
-    // 移除对应的动态规则
     const rules = await chrome.declarativeNetRequest.getDynamicRules();
-    const toRemove = rules
-      .filter(r => r.condition.urlFilter === `||${domain}`)
-      .map(r => r.id);
-
+    const toRemove = rules.filter(r => r.condition.urlFilter === `||${domain}`).map(r => r.id);
     if (toRemove.length > 0) {
-      await chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: toRemove
-      });
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: toRemove });
     }
 
     sendResponse({ success: true, allowlist });
@@ -220,10 +275,7 @@ async function handleRemoveAllowlist(domain, sendResponse) {
 
 async function handleBlockElement(selector, tabId, sendResponse) {
   try {
-    await chrome.tabs.sendMessage(tabId, {
-      type: 'HIDE_ELEMENT',
-      selector
-    });
+    await chrome.tabs.sendMessage(tabId, { type: 'HIDE_ELEMENT', selector });
     sendResponse({ success: true });
   } catch (error) {
     sendResponse({ success: false, error: error.message });
@@ -235,24 +287,18 @@ async function handleGetBlockedRequests(sendResponse) {
     const enabledRulesets = await chrome.declarativeNetRequest.getEnabledRulesets();
     const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
 
-    // 统计所有规则
-    // 注意：getStaticRuleIds API 在 Chrome 中不可用。
-    // 使用 getAvailableStaticRuleCount() 获取剩余可用配额，
-    // 用 GUARANTEED_MINIMUM_STATIC_RULES - 可用配额 估算已用数量
     let totalRules = dynamicRules.length;
     try {
       const available = await chrome.declarativeNetRequest.getAvailableStaticRuleCount();
       const guaranteed = chrome.declarativeNetRequest.GUARANTEED_MINIMUM_STATIC_RULES || 30000;
       totalRules += (guaranteed - available);
-    } catch (e) {
-      // 估算失败，至少显示动态规则数
-    }
+    } catch (_) {}
 
     sendResponse({
       success: true,
       rulesCount: totalRules,
-      enabledRulesets: enabledRulesets,
-      dynamicRulesCount: dynamicRules.length
+      enabledRulesets,
+      dynamicRulesCount: dynamicRules.length,
     });
   } catch (error) {
     sendResponse({ success: false, error: error.message });
@@ -260,18 +306,11 @@ async function handleGetBlockedRequests(sendResponse) {
 }
 
 // ============================================================
-// 定时刷新规则集统计
+// 定时刷新
 // ============================================================
 chrome.alarms.create('refreshStats', { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'refreshStats') {
-    refreshRulesetStats();
-  }
+  if (alarm.name === 'refreshStats') refreshRulesetStats();
 });
 
-// ============================================================
-// 工具栏图标点击事件
-// ============================================================
-chrome.action.onClicked.addListener(async (tab) => {
-  // popup 会自动打开，这里不需要额外逻辑
-});
+chrome.action.onClicked.addListener(async (tab) => {});
