@@ -174,76 +174,8 @@ class ScriptletEngine {
       this.defineProperty(window, key, value);
     });
 
-    // 增强：覆盖 Bait Element 检测 (+)
-    this.injectBaitElementBypass();
-    this.injectComputedStyleBypass();
-  }
-
-  // ============================================================
-  // 3a. Bait Element 检测绕过 (uBO 增强)
-  // ============================================================
-  injectBaitElementBypass() {
-    // 覆盖 offsetHeight - 反广告检测最常用的 API
-    try {
-      const originalGetHeight = Object.getOwnPropertyDescriptor(
-        HTMLElement.prototype, 'offsetHeight'
-      )?.get;
-      if (originalGetHeight) {
-        Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-          get: function() {
-            if (this.dataset.__abp_hidden) {
-              // 已被拦截的元素，返回正常值欺骗检测脚本
-              return parseInt(this.style.height) || 250;
-            }
-            return originalGetHeight.call(this);
-          }
-        });
-      }
-    } catch (e) {
-      // 某些浏览器可能不支持覆盖
-    }
-
-    try {
-      const originalGetWidth = Object.getOwnPropertyDescriptor(
-        HTMLElement.prototype, 'offsetWidth'
-      )?.get;
-      if (originalGetWidth) {
-        Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
-          get: function() {
-            if (this.dataset.__abp_hidden) {
-              return parseInt(this.style.width) || 300;
-            }
-            return originalGetWidth.call(this);
-          }
-        });
-      }
-    } catch (e) {}
-  }
-
-  // ============================================================
-  // 3b. getComputedStyle 检测绕过 (uBO 增强)
-  // ============================================================
-  injectComputedStyleBypass() {
-    try {
-      const originalGetComputedStyle = window.getComputedStyle;
-      window.getComputedStyle = function(el, pseudoElt) {
-        const style = originalGetComputedStyle.call(this, el, pseudoElt);
-
-        if (el.dataset?.__abp_hidden) {
-          return new Proxy(style, {
-            get(target, prop) {
-              if (prop === 'display') return 'block';
-              if (prop === 'visibility') return 'visible';
-              if (prop === 'opacity') return '1';
-              if (prop === 'height') return '250px';
-              if (prop === 'width') return '300px';
-              return target[prop];
-            }
-          });
-        }
-        return style;
-      };
-    } catch (e) {}
+    // Anti-Adblock Engine 已在主世界处理了 bait element
+    // 和 getComputedStyle 防御，这里不再重复
   }
 
   // ============================================================

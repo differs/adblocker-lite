@@ -16,9 +16,10 @@
  * │  ② uBOL CSS Rules       → 20,000+ CSS 隐藏规则         │
  * │  ③ Cosmetic Engine      → 程序化广告检测 (尺寸/位置)    │
  * │  ④ Scriptlet Engine     → 反广告检测 JS 注入            │
- * │  ⑤ Tracker Stripper     → URL 追踪参数清理              │
- * │  ⑥ Element Picker       → 用户点击选择隐藏              │
- * │  ⑦ MutationObserver     → 动态广告监控                  │
+ * │  ⑤ Anti-Adblock Engine  → 10 层反广告检测防御           │
+ * │  ⑥ Tracker Stripper     → URL 追踪参数清理              │
+ * │  ⑦ Element Picker       → 用户点击选择隐藏              │
+ * │  ⑧ MutationObserver     → 动态广告监控                  │
  * └─────────────────────────────────────────────────────────┘
  */
 
@@ -139,6 +140,17 @@ class AdBlockerContent {
 let adblocker = null;
 
 function initialize() {
+  // 1. 防御注入器在 defense-injector.js 中已自动执行
+  //    它在 document.documentElement.appendChild 阶段注入到主世界
+
+  // 2. 激活反广告引擎（isolated world 层）
+  try {
+    antiAdblockEngine.activateAll();
+  } catch (e) {
+    console.debug('[AdBlocker] AntiAdblock 引擎激活失败:', e.message);
+  }
+
+  // 3. 启动主引擎
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       adblocker = new AdBlockerContent();
@@ -152,7 +164,6 @@ function initialize() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => initialize());
 } else {
-  // 小延迟确保前面的引擎已完成
   setTimeout(initialize, 50);
 }
 
