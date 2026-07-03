@@ -204,7 +204,9 @@ class CosmeticFilterEngine {
       [id*="advert"]:not([id*="advertisement"]),
       [class*="advert"]:not([class*="advertisement"]),
       [class*="sponsor"]:not([class*="sponsorship"]),
-      [class*="banner"]:not([class*="banner"]):not([role="banner"]),
+      [id*="banner"]:not([role="banner"]):not([id*="admin"]):not([id*="dashboard"]),
+      [class*="banner"]:not([role="banner"]),
+      [class*="bnr"]:not([role="banner"]),
       [class*="promo"]:not([class*="promotion"]),
       [class*="commercial"],
       [class*="googleads"],
@@ -369,6 +371,23 @@ class CosmeticFilterEngine {
     if (el.getAttribute('aria-hidden') === 'true' &&
         el.innerHTML.trim() === '' && rect.width > 100) {
       return true;
+    }
+
+    // 特征 5b：base64 内嵌图片 + 广告类 alt 文字
+    // <img src="data:image/..." alt="同城热聊" id="article-top-banner">
+    if (tag === 'img') {
+      const src = el.getAttribute('src') || '';
+      const alt = (el.getAttribute('alt') || '').toLowerCase();
+      const id = (el.id || '').toLowerCase();
+      const adAltKeywords = ['广告', '推广', '赞助', '同城', '热聊', '交友',
+        '撩', '直播', '赚钱', '兼职', '彩票', '游戏', '注册', 'bet', 'casino',
+        'ad', 'sponsor', 'promo', 'banner', 'hot'];
+      // base64 内嵌图 + alt/ID 含广告关键词
+      if (src.startsWith('data:image') || src.startsWith('data:')) {
+        if (adAltKeywords.some(k => alt.includes(k) || id.includes(k))) {
+          return true;
+        }
+      }
     }
 
     // 特征 6：原生广告 / 伪装成内容的广告（图片+链接）
