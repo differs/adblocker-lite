@@ -431,5 +431,12 @@ class DefenseInjector {
 const defenseInjector = new DefenseInjector();
 
 // === 自动执行：document_start 时立即注入主世界 ===
-// document.documentElement 在 document_start 时保证存在
-defenseInjector.inject();
+// 大部分情况下 document.documentElement 在 document_start 已存在。
+// about:blank/srcdoc iframe 中可能为 null，此时等 DOMContentLoaded。
+if (document.documentElement) {
+  defenseInjector.inject();
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    defenseInjector.inject();
+  }, { once: true });
+}
