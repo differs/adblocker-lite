@@ -54,6 +54,9 @@ async function initialize() {
   }
 
   await refreshRulesetStats();
+
+  // 创建定时器（必须在初始化内部，不要在模块顶层）
+  try { chrome.alarms.create('refreshStats', { periodInMinutes: 5 }); } catch (_) {}
 }
 
 chrome.runtime.onInstalled.addListener(initialize);
@@ -308,7 +311,6 @@ async function handleGetBlockedRequests(sendResponse) {
 // ============================================================
 // 定时刷新
 // ============================================================
-chrome.alarms.create('refreshStats', { periodInMinutes: 5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'refreshStats') refreshRulesetStats();
 });

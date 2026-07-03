@@ -73,6 +73,19 @@ async function loadAllowlist() {
   }
 }
 
+async function loadCurrentPage() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.url) {
+      const url = new URL(tab.url);
+      elements.pageUrl.textContent = url.hostname;
+      elements.pageUrl.title = tab.url;
+    }
+  } catch (e) {
+    elements.pageUrl.textContent = '无法获取';
+  }
+}
+
 async function loadBlockedRequests() {
   const response = await chrome.runtime.sendMessage({ type: 'GET_BLOCKED_REQUESTS' });
   if (response.success) {

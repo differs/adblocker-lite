@@ -37,8 +37,17 @@ const DEFENSE_CODE = `
   ];
 
   const isBait = function(el) {
-    if (!el || !el.className) return false;
-    var cls = el.className.toLowerCase();
+    if (!el) return false;
+    var cls = '';
+    if (typeof el.className === 'string') {
+      cls = el.className.toLowerCase();
+    } else if (el.className && typeof el.className.baseVal === 'string') {
+      // SVG elements: className is SVGAnimatedString
+      cls = el.className.baseVal.toLowerCase();
+    } else if (el.classList && el.classList.length) {
+      cls = el.classList.value.toLowerCase();
+    }
+    if (!cls) return false;
     for (var i = 0; i < BAIT_PATTERNS.length; i++) {
       if (cls.indexOf(BAIT_PATTERNS[i]) !== -1) return true;
     }
@@ -412,18 +421,26 @@ class DefenseInjector {
 
     let script = null;
     try {
+      // 使用 Blob URL 代替 inline script，绕过页面 CSP 对 inline 脚本的限制
+      const blob = new Blob([DEFENSE_CODE], { type: 'text/javascript' });
+      const url = URL.createObjectURL(blob);
+
       script = document.createElement('script');
-      script.textContent = DEFENSE_CODE;
+      script.src = url;
       script.id = '__adblocker_defense';
-      // document_start 阶段 document.documentElement 一定存在
+
+      // 注入成功后释放 Blob URL
+      script.onload = () => { URL.revokeObjectURL(url); };
+      script.onerror = () => { URL.revokeObjectURL(url); };
+
       document.documentElement.appendChild(script);
     } catch (e) {
       console.error('[DefenseInjector] 注入失败:', e.message);
-      // 不使用 document.write 兜底——它会清空页面
       return;
     } finally {
-      if (script && script.parentNode) {
-        script.remove();
+      if (script && script.parentNode && script.src) {
+        // 注意：不能立即 remove，脚本需要时间执行。
+        // 清理由 onload/onerror 处理
       }
     }
 
