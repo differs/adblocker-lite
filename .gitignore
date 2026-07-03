@@ -13,3 +13,4 @@ Thumbs.db
 
 # Node
 node_modules/
+\n# Chrome extension generated metadata\n_metadata/\n.DS_Store
