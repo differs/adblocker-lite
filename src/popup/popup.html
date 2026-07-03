@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AdBlocker Lite</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <span class="logo-icon">🛡️</span>
+        <h1>AdBlocker Lite</h1>
+      </div>
+      <div class="status" id="status">
+        <span class="status-dot active"></span>
+        运行中
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="totalBlocked">0</div>
+        <div class="stat-label">总拦截</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="sessionBlocked">0</div>
+        <div class="stat-label">本次会话</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="uptime">0s</div>
+        <div class="stat-label">运行时长</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="rulesCount">0</div>
+        <div class="stat-label">拦截规则</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="current">当前页面</button>
+      <button class="tab" data-tab="allowlist">白名单</button>
+      <button class="tab" data-tab="about">关于</button>
+    </div>
+
+    <!-- Tab Content: Current Page -->
+    <div class="tab-content active" id="tab-current">
+      <div class="current-page" id="currentPage">
+        <div class="page-info">
+          <span class="page-icon">🌐</span>
+          <span class="page-url" id="pageUrl">加载中...</span>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="btnWhitelist">
+            ✅ 加入白名单
+          </button>
+        </div>
+      </div>
+      <div class="blocked-list">
+        <h3>最近拦截的请求</h3>
+        <div class="blocked-items" id="blockedItems">
+          <div class="empty-state">暂无拦截记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab Content: Allowlist -->
+    <div class="tab-content" id="tab-allowlist">
+      <div class="allowlist-controls">
+        <input type="text" id="allowlistInput" placeholder="输入域名，如 example.com">
+        <button class="btn btn-primary" id="btnAddAllowlist">添加</button>
+      </div>
+      <div class="allowlist-items" id="allowlistItems">
+        <div class="empty-state">暂无白名单</div>
+      </div>
+    </div>
+
+    <!-- Tab Content: About -->
+    <div class="tab-content" id="tab-about">
+      <div class="about-section">
+        <h3>AdBlocker Lite</h3>
+        <p>基于 declarativeNetRequest 的广告拦截扩展</p>
+        <p>版本: 1.0.0</p>
+        <div class="tech-stack">
+          <h4>技术栈</h4>
+          <ul>
+            <li>Manifest V3</li>
+            <li>declarativeNetRequest API</li>
+            <li>Service Worker</li>
+            <li>Content Scripts</li>
+            <li>uBO Lite 规则引擎</li>
+          </ul>
+        </div>
+        <div class="rules-info">
+          <h4>规则集 (6 个核心规则集)</h4>
+          <ul id="rulesetsInfo">
+            <li>uBO Filters - 广告 + 追踪 + 恶意软件</li>
+            <li>EasyList - 广告过滤</li>
+            <li>EasyPrivacy - 隐私保护</li>
+            <li>Peter Lowe - 广告/追踪服务器</li>
+            <li>uBO Badware - 恶意网站</li>
+            <li>URLhaus - 恶意 URL</li>
+          </ul>
+          <p style="font-size:12px;color:var(--text-secondary);margin-top:8px;">
+            规则通过 <code>scripts/build-rules.mjs</code> 从 uBO Lite 自动生成
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

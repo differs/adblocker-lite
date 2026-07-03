@@ -1,0 +1,371 @@
+/* ============================================================
+   AdBlocker Lite - Popup Styles
+   ============================================================ */
+
+:root {
+  --primary: #4A90D9;
+  --primary-dark: #357ABD;
+  --success: #52C41A;
+  --danger: #FF4D4F;
+  --bg: #FFFFFF;
+  --bg-secondary: #F5F7FA;
+  --text: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --border: #E5E5EA;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --radius: 12px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  width: 360px;
+  min-height: 400px;
+  font-size: 14px;
+}
+
+.container {
+  padding: 16px;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo-icon {
+  font-size: 24px;
+}
+
+.logo h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.status-dot.active {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(82, 196, 26, 0.4);
+}
+
+/* ============================================================
+   Stats
+   ============================================================ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 12px 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   Tabs
+   ============================================================ */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab.active {
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.tab:hover:not(.active) {
+  color: var(--text);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ============================================================
+   Current Page
+   ============================================================ */
+.current-page {
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.page-icon {
+  font-size: 18px;
+}
+
+.page-url {
+  font-size: 13px;
+  color: var(--text-secondary);
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ============================================================
+   Blocked List
+   ============================================================ */
+.blocked-list h3 {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.blocked-items {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.blocked-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.blocked-item:hover {
+  background: var(--bg-secondary);
+}
+
+.blocked-item .block-icon {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.blocked-item .block-url {
+  word-break: break-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   Empty State
+   ============================================================ */
+.empty-state {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* ============================================================
+   Allowlist
+   ============================================================ */
+.allowlist-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.allowlist-controls input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.allowlist-controls input:focus {
+  border-color: var(--primary);
+}
+
+.allowlist-items {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.allowlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.allowlist-item:hover {
+  background: var(--bg-secondary);
+}
+
+.allowlist-item .domain {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.allowlist-item .remove-btn {
+  border: none;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.allowlist-item .remove-btn:hover {
+  background: rgba(255, 77, 79, 0.1);
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-secondary);
+}
+
+/* ============================================================
+   About Section
+   ============================================================ */
+.about-section h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.about-section p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.about-section h4 {
+  font-size: 13px;
+  margin: 12px 0 6px;
+  color: var(--text);
+}
+
+.about-section ul {
+  list-style: none;
+  padding: 0;
+}
+
+.about-section ul li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  padding-left: 16px;
+  position: relative;
+}
+
+.about-section ul li::before {
+  content: '•';
+  position: absolute;
+  left: 4px;
+  color: var(--primary);
+}

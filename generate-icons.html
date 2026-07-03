@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AdBlocker Lite - Generate Icons</title>
+</head>
+<body>
+  <h1>AdBlocker Lite Icon Generator</h1>
+  <p>点击下面的按钮生成图标文件</p>
+  <button onclick="generateIcons()">生成并下载所有图标</button>
+  <div id="preview" style="margin-top: 20px;"></div>
+
+  <script>
+    function drawIcon(size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // 背景：圆形渐变
+      const gradient = ctx.createRadialGradient(
+        size/2, size/2, 0,
+        size/2, size/2, size/2
+      );
+      gradient.addColorStop(0, '#4A90D9');
+      gradient.addColorStop(1, '#2C5F8A');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 盾牌图标
+      ctx.fillStyle = '#FFFFFF';
+      const s = size;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.3, s * 0.25);
+      ctx.lineTo(s * 0.5, s * 0.15);
+      ctx.lineTo(s * 0.7, s * 0.25);
+      ctx.lineTo(s * 0.7, s * 0.5);
+      ctx.quadraticCurveTo(s * 0.5, s * 0.75, s * 0.5, s * 0.85);
+      ctx.quadraticCurveTo(s * 0.5, s * 0.75, s * 0.3, s * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // 盾牌中的勾
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = s * 0.04;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(s * 0.38, s * 0.46);
+      ctx.lineTo(s * 0.46, s * 0.55);
+      ctx.lineTo(s * 0.62, s * 0.38);
+      ctx.stroke();
+
+      return canvas;
+    }
+
+    function generateIcons() {
+      const sizes = [16, 48, 128];
+      const preview = document.getElementById('preview');
+      preview.innerHTML = '';
+
+      sizes.forEach(size => {
+        const canvas = drawIcon(size);
+
+        // 预览
+        const img = document.createElement('img');
+        img.src = canvas.toDataURL('image/png');
+        img.style.margin = '8px';
+        img.style.border = '1px solid #ccc';
+        img.style.borderRadius = '4px';
+        preview.appendChild(img);
+
+        // 下载
+        const link = document.createElement('a');
+        link.download = `icon-${size}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.textContent = ` 下载 ${size}x${size}`;
+        link.style.display = 'block';
+        link.style.margin = '4px 0';
+        preview.appendChild(link);
+      });
+    }
+  </script>
+</body>
+</html>

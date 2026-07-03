@@ -1,0 +1,100 @@
+{
+  "manifest_version": 3,
+  "name": "AdBlocker Lite - 学习与实践",
+  "version": "2.0.0",
+  "description": "基于 declarativeNetRequest + uBOL 规则引擎的广告拦截扩展 - Manifest V3 实战项目",
+  "author": "AdBlocker Learning Project",
+  "homepage_url": "https://github.com/learning/adblocker-lite",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    },
+    "default_title": "AdBlocker Lite"
+  },
+  "background": {
+    "service_worker": "src/background/service_worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "src/scriptlets/scriptlet-engine.js",
+        "src/cosmetic/cosmetic-engine.js",
+        "src/anti-tracking/tracker-params.js",
+        "src/picker/element-picker.js",
+        "src/content/content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "rulesets/scripting/*",
+        "web_accessible_resources/*",
+        "src/scriptlets/*",
+        "src/cosmetic/*",
+        "src/anti-tracking/*",
+        "src/picker/*",
+        "assets/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "ublock-filters",
+        "enabled": true,
+        "path": "rulesets/main/ublock-filters.json"
+      },
+      {
+        "id": "easylist",
+        "enabled": true,
+        "path": "rulesets/main/easylist.json"
+      },
+      {
+        "id": "easyprivacy",
+        "enabled": true,
+        "path": "rulesets/main/easyprivacy.json"
+      },
+      {
+        "id": "pgl",
+        "enabled": true,
+        "path": "rulesets/main/pgl.json"
+      },
+      {
+        "id": "ublock-badware",
+        "enabled": true,
+        "path": "rulesets/main/ublock-badware.json"
+      },
+      {
+        "id": "urlhaus-full",
+        "enabled": true,
+        "path": "rulesets/main/urlhaus-full.json"
+      }
+    ]
+  },
+  "minimum_chrome_version": "120"
+}
