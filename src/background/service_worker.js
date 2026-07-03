@@ -253,21 +253,21 @@ async function handleGetBlockedRequests(sendResponse) {
     const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
 
     // 统计所有规则
-    let totalRules = 0;
-    for (const rsId of enabledRulesets) {
-      try {
-        const rules = await chrome.declarativeNetRequest.getStaticRuleIds({
-          rulesetId: rsId
-        });
-        totalRules += rules.length;
-      } catch (e) {
-        // 单个规则集统计失败不影响其他
-      }
+    // 注意：getStaticRuleIds API 在 Chrome 中不可用。
+    // 使用 getAvailableStaticRuleCount() 获取剩余可用配额，
+    // 用 GUARANTEED_MINIMUM_STATIC_RULES - 可用配额 估算已用数量
+    let totalRules = dynamicRules.length;
+    try {
+      const available = await chrome.declarativeNetRequest.getAvailableStaticRuleCount();
+      const guaranteed = chrome.declarativeNetRequest.GUARANTEED_MINIMUM_STATIC_RULES || 30000;
+      totalRules += (guaranteed - available);
+    } catch (e) {
+      // 估算失败，至少显示动态规则数
     }
 
     sendResponse({
       success: true,
-      rulesCount: totalRules + dynamicRules.length,
+      rulesCount: totalRules,
       enabledRulesets: enabledRulesets,
       dynamicRulesCount: dynamicRules.length
     });

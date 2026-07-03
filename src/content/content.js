@@ -140,17 +140,16 @@ class AdBlockerContent {
 let adblocker = null;
 
 function initialize() {
-  // 1. 防御注入器在 defense-injector.js 中已自动执行
-  //    它在 document.documentElement.appendChild 阶段注入到主世界
+  // defense-injector.js 已自动注入主世界防御（在 document_start 时）
+  // anti-adblock-engine.js 的 activateAll 在这里手动激活
 
-  // 2. 激活反广告引擎（isolated world 层）
   try {
     antiAdblockEngine.activateAll();
   } catch (e) {
     console.debug('[AdBlocker] AntiAdblock 引擎激活失败:', e.message);
   }
 
-  // 3. 启动主引擎
+  // 启动主引擎
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       adblocker = new AdBlockerContent();

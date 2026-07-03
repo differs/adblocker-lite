@@ -138,14 +138,17 @@ class TrackerParamStripper {
    * 通过 content script 拦截 fetch/XHR
    */
   interceptNetworkRequests() {
+    // 保存 this 引用供内部回调使用
+    const self = this;
+
     // 拦截 fetch
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
       let url = args[0];
       if (typeof url === 'string') {
-        args[0] = this.stripTrackingParams(url);
+        args[0] = self.stripTrackingParams(url);
       } else if (url instanceof Request) {
-        const cleaned = this.stripTrackingParams(url.url);
+        const cleaned = self.stripTrackingParams(url.url);
         if (cleaned !== url.url) {
           args[0] = new Request(cleaned, url);
         }
@@ -153,11 +156,12 @@ class TrackerParamStripper {
       return originalFetch.call(window, ...args);
     };
 
-    // 拦截 XMLHttpRequest
+    // 拦截 XMLHttpRequest - 使用已存在的实例方法，避免创建新实例
     const originalOpen = XMLHttpRequest.prototype.open;
+    const stripFn = (url) => self.stripTrackingParams(url);
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
       if (typeof url === 'string') {
-        url = this._strippedUrl = (new TrackerParamStripper()).stripTrackingParams(url);
+        url = stripFn(url);
       }
       return originalOpen.call(this, method, url, ...rest);
     };

@@ -142,14 +142,14 @@ const DEFENSE_CODE = `
   } catch(e) {}
 
   // ============================================================
-  // 防御 4: Canvas 指纹
+  // 防御 4: Canvas 指纹 (toDataURL + toBlob + getImageData + WebGL)
   // ============================================================
   try {
     var origToDataURL = HTMLCanvasElement.prototype.toDataURL;
     HTMLCanvasElement.prototype.toDataURL = function() {
       var dataURL = origToDataURL.apply(this, arguments);
+      // 小 canvas 或透明 canvas → 加噪点破坏指纹
       if (this.width <= 256 && this.height <= 256) {
-        // 小 canvas -> 加噪点
         try {
           var parts = dataURL.split(',');
           if (parts[1]) {
@@ -165,6 +165,67 @@ const DEFENSE_CODE = `
         } catch(_) {}
       }
       return dataURL;
+    };
+  } catch(e) {}
+
+  // toBlob -> 使用 toDataURL 加噪点后转回 Blob
+  try {
+    var origToBlob = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function(callback, type, quality) {
+      if (this.width <= 256 && this.height <= 256) {
+        // 小 canvas: 通过 toDataURL（已加噪点）再转 blob
+        var noisyDataURL = this.toDataURL(type, quality);
+        var parts = noisyDataURL.split(',');
+        if (parts[1]) {
+          var binary = atob(parts[1]);
+          var array = new Uint8Array(binary.length);
+          for (var i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+          }
+          callback(new Blob([array], { type: type || 'image/png' }));
+          return;
+        }
+      }
+      origToBlob.call(this, callback, type, quality);
+    };
+  } catch(e) {}
+
+  // getImageData -> 像素加噪点
+  try {
+    var origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
+    CanvasRenderingContext2D.prototype.getImageData = function() {
+      var imageData = origGetImageData.apply(this, arguments);
+      if (imageData && imageData.data) {
+        // 每 20 个像素改一个字节 → 哈希变化但肉眼不可见
+        for (var i = 0; i < imageData.data.length; i += 80) {
+          imageData.data[i] = imageData.data[i] ^ 1;
+        }
+      }
+      return imageData;
+    };
+  } catch(e) {}
+
+  // WebGL 指纹: 统一显卡型号
+  try {
+    var origGetParam = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(pname) {
+      if (pname === 37445) return 'Intel Inc.';
+      if (pname === 37446) return 'Intel Iris OpenGL Engine';
+      return origGetParam.call(this, pname);
+    };
+  } catch(e) {}
+
+  try {
+    var origReadPixels = WebGLRenderingContext.prototype.readPixels;
+    WebGLRenderingContext.prototype.readPixels = function(x, y, w, h, format, type, pixels) {
+      var result = origReadPixels.call(this, x, y, w, h, format, type, pixels);
+      if (w <= 64 && h <= 64 && pixels && pixels.byteLength > 0) {
+        var view = new Uint8Array(pixels);
+        for (var i = 0; i < view.length; i += 100) {
+          view[i] = view[i] ^ 1;
+        }
+      }
+      return result;
     };
   } catch(e) {}
 
@@ -210,23 +271,28 @@ const DEFENSE_CODE = `
     };
 
     // PerformanceObserver 回调过滤
-    var origPO = window.PerformanceObserver;
-    if (origPO) {
-      window.PerformanceObserver = function(callback) {
-        return new origPO(function(list, obs) {
-          var filteredList = Object.create(list);
-          filteredList.getEntries = function() {
-            return list.getEntries().filter(function(entry) {
-              if (entry.entryType !== 'resource') return true;
-              if (!entry.name) return false;
-              if (entry.duration === 0 && isAdUrl(entry.name)) return false;
-              return true;
-            });
+    // 使用 class extends 保持 instanceof 正确
+    var OrigPerformanceObserver = window.PerformanceObserver;
+    if (OrigPerformanceObserver) {
+      window.PerformanceObserver = (function(OrigPO) {
+        function PatchedPerformanceObserver(callback) {
+          var wrappedCallback = function(list, obs) {
+            var patchedList = Object.create(list);
+            patchedList.getEntries = function() {
+              return list.getEntries().filter(function(entry) {
+                if (entry.entryType !== 'resource') return true;
+                if (!entry.name) return false;
+                if (entry.duration === 0 && isAdUrl(entry.name)) return false;
+                return true;
+              });
+            };
+            return callback(patchedList, obs);
           };
-          callback(filteredList, obs);
-        });
-      };
-      window.PerformanceObserver.prototype = origPO.prototype;
+          return new OrigPO(wrappedCallback);
+        }
+        PatchedPerformanceObserver.prototype = OrigPO.prototype;
+        return PatchedPerformanceObserver;
+      })(OrigPerformanceObserver);
     }
   } catch(e) {}
 
@@ -259,30 +325,28 @@ const DEFENSE_CODE = `
   // ============================================================
   // 防御 7: IntersectionObserver
   // ============================================================
+  // 注意：IntersectionObserver 的 callback 保存在构造函数闭包中，
+  // 无法通过 this._callback 访问。正确的做法是替换整个构造函数。
   try {
-    var origObserve = IntersectionObserver.prototype.observe;
-    IntersectionObserver.prototype.observe = function(target) {
-      if (!this.__adblocker_patched) {
-        this.__adblocker_patched = true;
-        var origCallback = this._callback;
-        if (origCallback) {
-          this._callback = function(entries) {
-            var filtered = entries.map(function(entry) {
-              var el = entry.target;
-              if (isBait(el) || (el.dataset && el.dataset.__abp_hidden)) {
-                return Object.assign({}, entry, {
-                  isIntersecting: true,
-                  intersectionRatio: 1
-                });
-              }
-              return entry;
+    var OrigIntersectionObserver = window.IntersectionObserver;
+    window.IntersectionObserver = function(callback, options) {
+      var wrappedCallback = function(entries, observer) {
+        var filtered = entries.map(function(entry) {
+          var el = entry.target;
+          if (isBait(el) || (el.dataset && el.dataset.__abp_hidden)) {
+            return Object.assign({}, entry, {
+              isIntersecting: true,
+              intersectionRatio: 1
             });
-            origCallback.call(this, filtered, this);
-          };
-        }
-      }
-      return origObserve.call(this, target);
+          }
+          return entry;
+        });
+        return callback(filtered, observer);
+      };
+      var instance = new OrigIntersectionObserver(wrappedCallback, options);
+      return instance;
     };
+    window.IntersectionObserver.prototype = OrigIntersectionObserver.prototype;
   } catch(e) {}
 
   // ============================================================
@@ -345,3 +409,14 @@ class DefenseInjector {
 }
 
 const defenseInjector = new DefenseInjector();
+
+// === 自动执行：document_start 时立即注入主世界 ===
+// 注意：content script 运行在 isolated world，此 inject() 方法
+// 通过创建 <script> 元素将防御代码注入到页面的主世界。
+// 必须在任何页面脚本执行之前完成。
+if (document.documentElement) {
+  defenseInjector.inject();
+} else {
+  // documentElement 尚未就绪（极早期），等 DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', () => defenseInjector.inject());
+}
