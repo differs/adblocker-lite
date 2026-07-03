@@ -143,7 +143,6 @@ class CosmeticFilterEngine {
     if (!data || !data.selectors || !data.hostnames) return '';
 
     const currentHost = location.hostname;
-    const currentHostParts = currentHost.split('.').reverse();
     let cssBuffer = '';
 
     // hostnames 格式: { hash: ["host1","host2"] } 或 { hash: "host1" }

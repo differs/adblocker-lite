@@ -138,11 +138,21 @@ class TrackerParamStripper {
    * 通过 content script 拦截 fetch/XHR
    */
   interceptNetworkRequests() {
-    // 保存 this 引用供内部回调使用
     const self = this;
 
-    // 拦截 fetch
-    const originalFetch = window.fetch;
+    // 拦截 XMLHttpRequest（共享 prototype，影响所有世界）
+    const originalOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+      if (typeof url === 'string') {
+        try { url = self.stripTrackingParams(url); } catch (_) {}
+      }
+      return originalOpen.call(this, method, url, ...rest);
+    };
+
+    // 注意：fetch 是 per-world 的，从 isolated world 覆盖不影响页面脚本。
+    // 页面发起的 fetch 请求的追踪参数由 DNR removeParam 规则处理。
+    // 这里只覆盖供 content script 内部使用。
+    const originalFetch = window.fetch.bind(window);
     window.fetch = async (...args) => {
       let url = args[0];
       if (typeof url === 'string') {
@@ -153,17 +163,7 @@ class TrackerParamStripper {
           args[0] = new Request(cleaned, url);
         }
       }
-      return originalFetch.call(window, ...args);
-    };
-
-    // 拦截 XMLHttpRequest - 使用已存在的实例方法，避免创建新实例
-    const originalOpen = XMLHttpRequest.prototype.open;
-    const stripFn = (url) => self.stripTrackingParams(url);
-    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-      if (typeof url === 'string') {
-        url = stripFn(url);
-      }
-      return originalOpen.call(this, method, url, ...rest);
+      return originalFetch(...args);
     };
   }
 }

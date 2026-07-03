@@ -283,7 +283,6 @@ const DEFENSE_CODE = `
 
   // 10a: noopFunc - 替换反广告检测的回调
   var _noopFalse = function() { return false; };
-  var _noopTrue = function() { return true; };
 
   try { Object.defineProperty(window, 'adblock', { get: function() { return undefined; }, set: function(){}, configurable: true }); } catch(e) {}
   try { Object.defineProperty(window, 'adBlock', { get: function() { return undefined; }, set: function(){}, configurable: true }); } catch(e) {}
@@ -299,7 +298,6 @@ const DEFENSE_CODE = `
   // 10b: Google Ads bypass
   try {
     if (!window.adsbygoogle) { window.adsbygoogle = []; }
-    var _origPush = window.adsbygoogle.push;
     window.adsbygoogle.push = function() {
       if (arguments[0] && arguments[0].done) { setTimeout(function() { arguments[0].done(); }, 100); }
     };

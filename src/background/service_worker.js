@@ -79,23 +79,6 @@ async function refreshRulesetStats() {
   }
 }
 
-/**
- * 获取最近的拦截统计
- * 使用 getMatchedRules() 替代 onRuleMatchedDebug（生产环境可用）
- */
-async function getRecentBlockedCount() {
-  try {
-    // 获取最近 30 分钟的匹配规则
-    const result = await chrome.declarativeNetRequest.getMatchedRules({
-      minTimeStamp: Date.now() - 30 * 60 * 1000
-    });
-    return result?.rulesMatchedInfo?.length || 0;
-  } catch (e) {
-    // getMatchedRules 需要 declarativeNetRequestFeedback 权限
-    return 0;
-  }
-}
-
 // ============================================================
 // 消息处理：PopUp 与 Content Script 通信
 // ============================================================
