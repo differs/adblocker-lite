@@ -290,12 +290,30 @@ async function handleGetBlockedRequests(sendResponse) {
     const enabledRulesets = await chrome.declarativeNetRequest.getEnabledRulesets();
     const dynamicRules = await chrome.declarativeNetRequest.getDynamicRules();
 
-    let totalRules = dynamicRules.length;
+    // 从 ruleset-details.json 读取精确的规则数量（构建时自动生成）
+    // 避免使用 getAvailableStaticRuleCount() 的错误公式
+    let staticRuleCount = 0;
     try {
-      const available = await chrome.declarativeNetRequest.getAvailableStaticRuleCount();
-      const guaranteed = chrome.declarativeNetRequest.GUARANTEED_MINIMUM_STATIC_RULES || 30000;
-      totalRules += (guaranteed - available);
-    } catch (_) {}
+      const url = chrome.runtime.getURL('rulesets/ruleset-details.json');
+      const resp = await fetch(url);
+      const details = await resp.json();
+      for (const rs of details) {
+        if (rs.enabled && rs.rules?.total) {
+          staticRuleCount += rs.rules.total;
+        }
+      }
+    } catch (_) {
+      // fallback: 使用 DNR API 估算（可能不准确，但不至于负数）
+      try {
+        const available = await chrome.declarativeNetRequest.getAvailableStaticRuleCount();
+        const guaranteed = chrome.declarativeNetRequest.GUARANTEED_MINIMUM_STATIC_RULES || 30000;
+        if (available <= guaranteed) {
+          staticRuleCount = guaranteed - available;
+        }
+      } catch (_) {}
+    }
+
+    const totalRules = staticRuleCount + dynamicRules.length;
 
     sendResponse({
       success: true,

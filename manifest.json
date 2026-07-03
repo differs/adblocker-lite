@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AdBlocker Lite - 学习与实践",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "基于 declarativeNetRequest + uBOL 规则引擎的广告拦截扩展 - Manifest V3 实战项目",
   "author": "AdBlocker Learning Project",
   "homepage_url": "https://github.com/learning/adblocker-lite",
