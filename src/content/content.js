@@ -55,6 +55,12 @@ class AdBlockerContent {
                 this.hideElement(node);
               }
 
+              // 如果新增节点是 <img>，检查父 <a> 是否广告链接
+              if (node.tagName === 'IMG' && node.parentElement &&
+                  this.isAdElement(node.parentElement)) {
+                this.hideElement(node.parentElement);
+              }
+
               // 也检查后代
               const ads = node.querySelectorAll(
                 'div[class*="ad-"], div[id*="ad-"], ' +
@@ -153,6 +159,16 @@ class AdBlockerContent {
     el.style.setProperty('display', 'none', 'important');
     el.dataset.__abp_hidden = 'true';
     this.cssHiddenCount++;
+    // 如果隐藏的是 <a>（广告链接），同时也隐藏里面的 <img>
+    try {
+      const imgs = el.tagName === 'A' ? el.querySelectorAll('img') : [];
+      for (const img of imgs) {
+        if (!img.dataset.__abp_hidden) {
+          img.style.setProperty('display', 'none', 'important');
+          img.dataset.__abp_hidden = 'true';
+        }
+      }
+    } catch (_) {}
     if (typeof statsCollector !== 'undefined') {
       statsCollector.increment('css_base');
     }

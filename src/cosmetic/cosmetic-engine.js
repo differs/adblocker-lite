@@ -393,6 +393,13 @@ class CosmeticFilterEngine {
     // 特征 6：原生广告 / 伪装成内容的广告（图片+链接）
     if (this.isNativeAd(el)) return true;
 
+    // 特征 6b：当前元素是 <img>，检查父元素是否为广告
+    // <a href="https://pybzr198.com"><img ...></a>
+    // querySelectorAll 找不到父元素，需要反向检查
+    if (tag === 'img' && el.parentElement) {
+      if (this.isNativeAd(el.parentElement)) return true;
+    }
+
     return false;
   }
 
