@@ -22,13 +22,19 @@ class ScriptletEngine {
   }
 
   async loadUBOLScriptletMeta() {
-    const rulesets = ['ublock-filters', 'easyprivacy', 'ublock-badware'];
+    // ublock-badware 没有 isolated scriptlet，跳过
+    const rulesets = [
+      { id: 'ublock-filters', types: ['main', 'isolated'] },
+      { id: 'easyprivacy',    types: ['main', 'isolated'] },
+      { id: 'ublock-badware', types: ['main'] },  // 只有 main
+    ];
 
     for (const rs of rulesets) {
-      try {
-        await this._loadMeta(rs, 'main');
-        await this._loadMeta(rs, 'isolated');
-      } catch (_) {}
+      for (const type of rs.types) {
+        try {
+          await this._loadMeta(rs.id, type);
+        } catch (_) {}
+      }
     }
   }
 

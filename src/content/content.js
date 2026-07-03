@@ -86,14 +86,23 @@ class AdBlockerContent {
     });
   }
 
+  _getClassStr(el) {
+    try {
+      if (typeof el.className === 'string') return el.className.toLowerCase();
+      if (el.className?.baseVal) return el.className.baseVal.toLowerCase();
+      if (el.classList?.value) return el.classList.value.toLowerCase();
+    } catch (_) {}
+    return '';
+  }
+
   isAdElement(el) {
     if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
     const tag = el.tagName.toLowerCase();
     if (tag === 'body' || tag === 'html') return false;
     if (el.dataset.__abp_hidden) return false;
 
-    const classStr = el.className?.toLowerCase() || '';
-    const idStr = el.id?.toLowerCase() || '';
+    const classStr = this._getClassStr(el);
+    const idStr = (typeof el.id === 'string' ? el.id : '').toLowerCase();
 
     // 只看那些可能含有广告的特定标签
     if (tag !== 'div' && tag !== 'iframe' && tag !== 'ins' && tag !== 'section') {
