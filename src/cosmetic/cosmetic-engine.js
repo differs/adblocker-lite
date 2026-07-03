@@ -83,40 +83,41 @@ class CosmeticFilterEngine {
     // 格式: const lowlyGeneric = new Map(...); const highlyGeneric = "..."; const exceptions = [...];
     const cssSelectors = [];
 
-    // 提取 lowlyGeneric (每个站点独立的低特异性选择器)
-    const lowlyMatch = text.match(/const lowlyGeneric = new Map\(([^)]+)\)/);
-    if (lowlyMatch) {
-      try {
-        // 解析 key-value 对
-        const pairs = lowlyMatch[1].match(/\[(\d+),\"([^\"]+)\"\]/g);
-        if (pairs) {
-          for (const pair of pairs) {
-            const valMatch = pair.match(/"([^"]+)"/);
-            if (valMatch) {
-              // 有些选择器包含 :not(#style_important) 标记
-              const selector = valMatch[1].replace(/:not\(#style_important\)$/, '');
-              cssSelectors.push(selector);
-            }
+    // 提取 lowlyGeneric: 提取所有 selector 字符串
+    // 格式: [数字,"selector"] 或 [数字,'selector']
+    const selectorMatches = text.match(/\[\d+,("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\]/g);
+    if (selectorMatches) {
+      for (const match of selectorMatches) {
+        try {
+          // 提取引号内的内容
+          const inner = match.slice(match.indexOf(',') + 1).trim();
+          const quote = inner[0];
+          // 找到匹配的结束引号
+          let selector = '';
+          let i = 1;
+          while (i < inner.length - 1) {
+            if (inner[i] === '\\') { selector += inner[i] + (inner[i+1] || ''); i += 2; }
+            else if (inner[i] === quote) break;
+            else { selector += inner[i]; i++; }
           }
-        }
-      } catch (e) {
-        // 解析失败跳过
+          // 有些选择器包含 :not(#style_important) 标记
+          const clean = selector.replace(/:not\(#style_important\)$/, '').trim();
+          if (clean) cssSelectors.push(clean);
+        } catch (_) {}
       }
     }
 
     // 提取 highlyGeneric (高度通用的 CSS 选择器)
-    const highMatch = text.match(/const highlyGeneric = \/* \d+ \*\/([\s\S]*?);\s*\n\s*const exceptions/);
+    // 格式: const highlyGeneric = /* 数字 */ "选择器1,\n选择器2,...";
+    const highMatch = text.match(/const highlyGeneric\s*=\s*\/\*\s*\d+\s*\*\/\s*"([\s\S]*?)";\s*\n/);
     if (highMatch) {
       const selectors = highMatch[1]
-        .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除注释
-        .split(/,\n/)                         // 按换行逗号分割
-        .map(s => s.trim())
-        .filter(s => s && s !== '""' && s !== "''");
+        .replace(/\\\n/g, '')      // 移除换行转义
+        .split(/,\n?/)               // 按逗号分割
+        .map(s => s.trim().replace(/^"|"$/g, ''))
+        .filter(s => s && s !== '""');
       cssSelectors.push(...selectors);
     }
-
-    // 提取 exceptions（例外规则，反过来理解为不需要隐藏的站点）
-    // 不需要处理 exceptions，它们用于排除某些站点的规则
 
     if (cssSelectors.length === 0) return '';
 
@@ -139,14 +140,33 @@ class CosmeticFilterEngine {
     const data = await resp.json();
 
     // 格式: {"rulesetId":"...","selectors":{...},"hostnames":{...}}
-    if (!data || !data.selectors) return '';
+    if (!data || !data.selectors || !data.hostnames) return '';
 
     const currentHost = location.hostname;
+    const currentHostParts = currentHost.split('.').reverse();
     let cssBuffer = '';
 
-    // selectors 格式: { hash: "selector1, selector2" }
-    for (const [, selectorText] of Object.entries(data.selectors)) {
+    // hostnames 格式: { hash: ["host1","host2"] } 或 { hash: "host1" }
+    // 只加载匹配当前站点的 selector
+    for (const [hash, selectorText] of Object.entries(data.selectors)) {
       if (typeof selectorText !== 'string') continue;
+
+      const hosts = data.hostnames[hash];
+      if (!hosts) continue;
+
+      // 检查当前站点是否匹配
+      const hostList = Array.isArray(hosts) ? hosts : [hosts];
+      let matches = false;
+      for (const h of hostList) {
+        if (h === currentHost || h === '*') { matches = true; break; }
+        // 支持 *.example.com 通配
+        if (h.startsWith('*.')) {
+          const suffix = h.slice(1); // .example.com
+          if (currentHost.endsWith(suffix)) { matches = true; break; }
+        }
+      }
+      if (!matches) continue;
+
       cssBuffer += `${selectorText} { display: none !important; }\n`;
     }
 
